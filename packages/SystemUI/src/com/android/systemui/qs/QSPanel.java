@@ -498,6 +498,11 @@ public class QSPanel extends LinearLayout implements Tunable {
     private void switchAllContentToParent(ViewGroup parent, QSTileLayout newLayout) {
         int index = parent == this ? mMovableContentStartIndex : 0;
 
+        if (mTopLargeTilesLayout != null) {
+            switchToParent(mTopLargeTilesLayout, parent, index);
+            index++;
+        }
+
         // Let's first move the tileLayout to the new parent, since that should come first.
         switchToParent((View) newLayout, parent, index);
         index++;
@@ -791,7 +796,8 @@ public class QSPanel extends LinearLayout implements Tunable {
      * @return height with the {@link QSPanel#setSquishinessFraction(float)} applied.
      */
     public int getSquishedHeight() {
-        if (mBrightnessView != null && mBrightnessView.getVisibility() != GONE) {
+        if (mBrightnessView != null && mBrightnessView.getVisibility() != GONE
+                && mBrightnessView.getParent() == this) {
             final ViewGroup.LayoutParams lp = mBrightnessView.getLayoutParams();
             final int bottomMargin;
             if (lp instanceof MarginLayoutParams) {

@@ -407,7 +407,8 @@ public class QSAnimator implements QSHost.Callback, PagedTileLayout.PageListener
                     getRelativePosition(mTmpLoc1, qqsLayout, view);
                     mQQSTop = mTmpLoc1[1];
                     getRelativePosition(mTmpLoc2, tileView, view);
-                    int diff = mTmpLoc2[1] - (mTmpLoc1[1] + qqsLayout.getPhantomTopPosition(count));
+                    int adjustedIndex = Math.max(0, count - largeTilesCount);
+                    int diff = mTmpLoc2[1] - (mTmpLoc1[1] + qqsLayout.getPhantomTopPosition(adjustedIndex));
                     translationYBuilder.addFloat(tileView, "translationY", -diff, 0);
                     if (mOtherFirstPageTilesHeightAnimator == null) {
                         mOtherFirstPageTilesHeightAnimator =
