@@ -301,6 +301,8 @@ public class QSAnimator implements QSHost.Callback, PagedTileLayout.PageListener
         mLastQQSTileHeight = 0;
 
         if (mQsPanelController.areThereTiles()) {
+            int largeTilesCount = mQsRootView.getResources().getInteger(
+                    com.android.systemui.res.R.integer.quick_settings_large_tiles_count);
             for (QSTile tile : tiles) {
                 QSTileView tileView = mQsPanelController.getTileView(tile);
 
@@ -309,7 +311,8 @@ public class QSAnimator implements QSHost.Callback, PagedTileLayout.PageListener
                     continue;
                 }
                 // Only animate tiles in the first page
-                if (mPagedLayout != null && count >= mPagedLayout.getNumTilesFirstPage()) {
+                if (mPagedLayout != null
+                        && count >= (largeTilesCount + mPagedLayout.getNumTilesFirstPage())) {
                     break;
                 }
 
@@ -334,13 +337,15 @@ public class QSAnimator implements QSHost.Callback, PagedTileLayout.PageListener
                     translationXBuilder.addFloat(quickTileView, "translationX", 0, xOffset);
                     translationXBuilder.addFloat(tileView, "translationX", -xOffset, 0);
 
-                    if (mQQSTileHeightAnimator == null) {
-                        mQQSTileHeightAnimator = new HeightExpansionAnimator(this,
-                                quickTileView.getMeasuredHeight(), tileView.getMeasuredHeight());
-                        mLastQQSTileHeight = quickTileView.getMeasuredHeight();
-                    }
+                    if (count >= largeTilesCount) {
+                        if (mQQSTileHeightAnimator == null) {
+                            mQQSTileHeightAnimator = new HeightExpansionAnimator(this,
+                                    quickTileView.getMeasuredHeight(), tileView.getMeasuredHeight());
+                            mLastQQSTileHeight = quickTileView.getMeasuredHeight();
+                        }
 
-                    mQQSTileHeightAnimator.addView(quickTileView);
+                        mQQSTileHeightAnimator.addView(quickTileView);
+                    }
 
                     // Icons
                     translateContent(
@@ -561,10 +566,6 @@ public class QSAnimator implements QSHost.Callback, PagedTileLayout.PageListener
             mAllViews.add(qqsBrightness);
             int translationY = getRelativeTranslationY(qsBrightness, qqsBrightness);
             mBrightnessTranslationAnimator = new Builder()
-                    // we need to animate qs brightness even if animation will not be visible,
-                    // as we might start from sliderScaleY set to 0.3 if device was in collapsed QS
-                    // portrait orientation before
-                    .addFloat(qsBrightness, "sliderScaleY", 0.3f, 1)
                     .addFloat(qqsBrightness, "translationY", 0, translationY)
                     .setInterpolator(mQSExpansionPathInterpolator.getYInterpolator())
                     .build();

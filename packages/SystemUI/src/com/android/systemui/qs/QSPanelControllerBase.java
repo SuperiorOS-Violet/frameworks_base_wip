@@ -381,8 +381,11 @@ public abstract class QSPanelControllerBase<T extends QSPanel> extends ViewContr
 
     private void addTile(final QSTile tile, boolean collapsedView) {
         QSLongPressEffect longPressEffect = mLongPressEffectProvider.get();
+        int largeTilesCount = getResources().getInteger(
+                com.android.systemui.res.R.integer.quick_settings_large_tiles_count);
+        boolean isLargeTile = mRecords.size() < largeTilesCount;
         final QSTileViewImpl tileView = new QSTileViewImpl(
-                getContext(), collapsedView, longPressEffect);
+                getContext(), collapsedView, longPressEffect, isLargeTile);
         final TileRecord r = new TileRecord(tile, tileView);
         // TODO(b/250618218): Remove the QSLogger in QSTileViewImpl once we know the root cause of
         // b/250618218.

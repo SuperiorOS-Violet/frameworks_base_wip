@@ -80,6 +80,7 @@ constructor(
     context: Context,
     private val collapsed: Boolean = false,
     private val longPressEffect: QSLongPressEffect? = null,
+    val isLargeTile: Boolean = false,
 ) : QSTileView(context), HeightOverrideable, LaunchableView {
 
     companion object {
@@ -226,24 +227,56 @@ constructor(
             )
         }
         setId(generateViewId())
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL or Gravity.START
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         clipChildren = false
         clipToPadding = false
         isFocusable = true
-        background = createTileBackground()
+        icon.background = createTileBackground()
         setColor(getBackgroundColorForState(QSTile.State.DEFAULT_STATE))
 
-        val padding = resources.getDimensionPixelSize(R.dimen.qs_tile_padding)
-        val startPadding = resources.getDimensionPixelSize(R.dimen.qs_tile_start_padding)
-        setPaddingRelative(startPadding, padding, padding, padding)
-
-        val iconSize = resources.getDimensionPixelSize(R.dimen.qs_icon_size)
+        val iconSize = resources.getDimensionPixelSize(R.dimen.qs_quick_tile_size)
         addView(icon, LayoutParams(iconSize, iconSize))
 
         createAndAddLabels()
         createAndAddSideView()
+        applyTileLayoutStyle()
+    }
+
+    private fun applyTileLayoutStyle() {
+        val iconSize = resources.getDimensionPixelSize(R.dimen.qs_quick_tile_size)
+        icon.layoutParams.apply {
+            height = iconSize
+            width = iconSize
+        }
+        if (isLargeTile) {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            background = mContext.getDrawable(R.drawable.qs_card_background)
+            val padding = resources.getDimensionPixelSize(R.dimen.qs_tile_padding)
+            val startPadding = resources.getDimensionPixelSize(R.dimen.qs_tile_start_padding)
+            setPaddingRelative(startPadding, padding, padding, padding)
+        } else {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL or Gravity.TOP
+            background = null
+            setPaddingRelative(0, 0, 0, 0)
+            sideView.visibility = GONE
+            secondaryLabel.visibility = GONE
+            if (collapsed) {
+                labelContainer.visibility = GONE
+            } else {
+                labelContainer.visibility = VISIBLE
+                labelContainer.gravity = Gravity.CENTER_HORIZONTAL
+                label.gravity = Gravity.CENTER_HORIZONTAL
+                (labelContainer.layoutParams as MarginLayoutParams).apply {
+                    width = LayoutParams.MATCH_PARENT
+                    marginStart = 0
+                    topMargin = resources.getDimensionPixelSize(
+                        R.dimen.qs_circle_tile_label_margin_top
+                    )
+                }
+            }
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration?) {
@@ -270,20 +303,12 @@ constructor(
         FontSizeUtils.updateFontSize(label, R.dimen.qs_tile_text_size)
         FontSizeUtils.updateFontSize(secondaryLabel, R.dimen.qs_tile_text_size)
 
-        val iconSize = context.resources.getDimensionPixelSize(R.dimen.qs_icon_size)
-        icon.layoutParams.apply {
-            height = iconSize
-            width = iconSize
-        }
-
-        val padding = resources.getDimensionPixelSize(R.dimen.qs_tile_padding)
-        val startPadding = resources.getDimensionPixelSize(R.dimen.qs_tile_start_padding)
-        setPaddingRelative(startPadding, padding, padding, padding)
-
         val labelMargin = resources.getDimensionPixelSize(R.dimen.qs_label_container_margin)
-        (labelContainer.layoutParams as MarginLayoutParams).apply { marginStart = labelMargin }
-
-        (sideView.layoutParams as MarginLayoutParams).apply { marginStart = labelMargin }
+        if (isLargeTile) {
+            (labelContainer.layoutParams as MarginLayoutParams).apply { marginStart = labelMargin }
+            (sideView.layoutParams as MarginLayoutParams).apply { marginStart = labelMargin }
+        }
+        val iconSize = resources.getDimensionPixelSize(R.dimen.qs_icon_size)
         (chevronView.layoutParams as MarginLayoutParams).apply {
             height = iconSize
             width = iconSize
@@ -295,9 +320,10 @@ constructor(
             marginEnd = endMargin
         }
 
-        background = createTileBackground()
+        icon.background = createTileBackground()
         setColor(backgroundColor)
         setOverlayColor(backgroundOverlayColor)
+        applyTileLayoutStyle()
     }
 
     private fun createAndAddLabels() {
@@ -331,12 +357,7 @@ constructor(
     }
 
     private fun createTileBackground(): Drawable {
-        qsTileBackground =
-            if (Flags.qsTileFocusState()) {
-                mContext.getDrawable(R.drawable.qs_tile_background_flagged) as RippleDrawable
-            } else {
-                mContext.getDrawable(R.drawable.qs_tile_background) as RippleDrawable
-            }
+        qsTileBackground = mContext.getDrawable(R.drawable.qs_circle_tile_bg) as RippleDrawable
         qsTileFocusBackground = mContext.getDrawable(R.drawable.qs_tile_focused_background)!!
         backgroundDrawable =
             qsTileBackground.findDrawableByLayerId(R.id.background) as LayerDrawable
@@ -522,7 +543,7 @@ constructor(
     override fun setClickable(clickable: Boolean) {
         super.setClickable(clickable)
         if (!Flags.qsTileFocusState()) {
-            background =
+            icon.background =
                 if (clickable && showRippleEffect) {
                     qsTileBackground.also {
                         // In case that the colorBackgroundDrawable was used as the background, make
@@ -705,7 +726,9 @@ constructor(
         if (!Objects.equals(label.text, state.label)) {
             label.text = state.label
         }
-        if (!Objects.equals(secondaryLabel.text, state.secondaryLabel)) {
+        if (!isLargeTile) {
+            secondaryLabel.visibility = GONE
+        } else if (!Objects.equals(secondaryLabel.text, state.secondaryLabel)) {
             secondaryLabel.text = state.secondaryLabel
             secondaryLabel.visibility =
                 if (TextUtils.isEmpty(state.secondaryLabel)) {
@@ -765,7 +788,11 @@ constructor(
         }
 
         // Right side icon
-        loadSideViewDrawableIfNecessary(state)
+        if (isLargeTile) {
+            loadSideViewDrawableIfNecessary(state)
+        } else {
+            sideView.visibility = GONE
+        }
 
         label.isEnabled = !state.disabledByPolicy
 
@@ -888,8 +915,7 @@ constructor(
     private fun getLabelColorForState(state: Int, disabledByPolicy: Boolean = false): Int {
         return when {
             state == Tile.STATE_UNAVAILABLE || disabledByPolicy -> colorLabelUnavailable
-            state == Tile.STATE_ACTIVE -> colorLabelActive
-            state == Tile.STATE_INACTIVE -> colorLabelInactive
+            state == Tile.STATE_ACTIVE || state == Tile.STATE_INACTIVE -> colorLabelInactive
             else -> {
                 Log.e(TAG, "Invalid state $state")
                 0
@@ -900,8 +926,8 @@ constructor(
     private fun getSecondaryLabelColorForState(state: Int, disabledByPolicy: Boolean = false): Int {
         return when {
             state == Tile.STATE_UNAVAILABLE || disabledByPolicy -> colorSecondaryLabelUnavailable
-            state == Tile.STATE_ACTIVE -> colorSecondaryLabelActive
-            state == Tile.STATE_INACTIVE -> colorSecondaryLabelInactive
+            state == Tile.STATE_ACTIVE || state == Tile.STATE_INACTIVE ->
+                colorSecondaryLabelInactive
             else -> {
                 Log.e(TAG, "Invalid state $state")
                 0
@@ -971,7 +997,7 @@ constructor(
         val deltaH = (newHeight - startingHeight) / 2
         val deltaW = (newWidth - startingWidth) / 2
 
-        background.updateBounds(
+        (background ?: icon.background).updateBounds(
             left = -deltaW,
             top = -deltaH,
             right = newWidth - deltaW,
@@ -1029,7 +1055,7 @@ constructor(
         start + fraction * (end - start)
 
     fun resetLongPressEffectProperties() {
-        background.updateBounds(
+        (background ?: icon.background).updateBounds(
             left = 0,
             top = 0,
             right = initialLongPressProperties?.width?.toInt() ?: measuredWidth,
