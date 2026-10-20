@@ -96,6 +96,8 @@ public class QSPanel extends LinearLayout implements Tunable {
     private LinearLayout mHorizontalLinearLayout;
     @Nullable
     protected LinearLayout mHorizontalContentContainer;
+    @Nullable
+    protected LinearLayout mTopLargeTilesLayout;
 
     @Nullable
     protected QSTileLayout mTileLayout;
@@ -135,7 +137,23 @@ public class QSPanel extends LinearLayout implements Tunable {
     void initialize(QSLogger qsLogger, boolean usingMediaPlayer) {
         mQsLogger = qsLogger;
         mUsingMediaPlayer = usingMediaPlayer;
+        if (!(this instanceof QuickQSPanel) && mTopLargeTilesLayout == null) {
+            mTopLargeTilesLayout = new LinearLayout(mContext);
+            mTopLargeTilesLayout.setOrientation(LinearLayout.HORIZONTAL);
+            LayoutParams topLp = new LayoutParams(
+                    LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            topLp.bottomMargin = getResources().getDimensionPixelSize(
+                    R.dimen.qs_tile_margin_vertical);
+            addView(mTopLargeTilesLayout, 0);
+            mMovableContentStartIndex++;
+        }
         mTileLayout = getOrCreateTileLayout();
+        if (!(this instanceof QuickQSPanel)) {
+            View tileLayoutView = (View) mTileLayout;
+            tileLayoutView.setBackgroundResource(R.drawable.qs_card_background);
+            int pad = getResources().getDimensionPixelSize(R.dimen.qs_card_padding);
+            tileLayoutView.setPadding(pad, pad, pad, pad);
+        }
 
         if (mUsingMediaPlayer || SceneContainerFlag.isEnabled()) {
             mHorizontalLinearLayout = new RemeasuringLinearLayout(mContext);
@@ -206,14 +224,11 @@ public class QSPanel extends LinearLayout implements Tunable {
         if (mBrightnessView != null) {
             removeView(mBrightnessView);
             mChildrenLayoutTop.remove(mBrightnessView);
-            mMovableContentStartIndex--;
         }
-        addView(view, 0);
+        addView(view);
         mBrightnessView = view;
 
         setBrightnessViewMargin();
-
-        mMovableContentStartIndex++;
     }
 
     private void setBrightnessViewMargin() {
@@ -483,6 +498,11 @@ public class QSPanel extends LinearLayout implements Tunable {
     private void switchAllContentToParent(ViewGroup parent, QSTileLayout newLayout) {
         int index = parent == this ? mMovableContentStartIndex : 0;
 
+        if (mTopLargeTilesLayout != null) {
+            switchToParent(mTopLargeTilesLayout, parent, index);
+            index++;
+        }
+
         // Let's first move the tileLayout to the new parent, since that should come first.
         switchToParent((View) newLayout, parent, index);
         index++;
@@ -490,6 +510,11 @@ public class QSPanel extends LinearLayout implements Tunable {
         if (mFooter != null) {
             // Then the footer with the settings
             switchToParent(mFooter, parent, index);
+            index++;
+        }
+
+        if (mBrightnessView != null) {
+            switchToParent(mBrightnessView, parent, index);
             index++;
         }
     }
@@ -592,13 +617,32 @@ public class QSPanel extends LinearLayout implements Tunable {
         tileRecord.tileView.init(tileRecord.tile);
         tileRecord.tile.refreshState();
 
-        if (mTileLayout != null) {
+        if (mTopLargeTilesLayout != null
+                && tileRecord.tileView instanceof com.android.systemui.qs.tileimpl.QSTileViewImpl
+                && ((com.android.systemui.qs.tileimpl.QSTileViewImpl) tileRecord.tileView)
+                        .isLargeTile()) {
+            int height = getResources().getDimensionPixelSize(R.dimen.qs_tile_height);
+            int halfMargin = getResources().getDimensionPixelSize(
+                    R.dimen.qs_tile_margin_horizontal) / 2;
+            LayoutParams lp = new LayoutParams(0, height, 1f);
+            if (mTopLargeTilesLayout.getChildCount() == 0) {
+                lp.setMarginEnd(halfMargin);
+            } else {
+                lp.setMarginStart(halfMargin);
+            }
+            mTopLargeTilesLayout.addView(tileRecord.tileView, lp);
+        } else if (mTileLayout != null) {
             mTileLayout.addTile(tileRecord);
         }
     }
 
     void removeTile(QSPanelControllerBase.TileRecord tileRecord) {
-        mTileLayout.removeTile(tileRecord);
+        if (mTopLargeTilesLayout != null
+                && tileRecord.tileView.getParent() == mTopLargeTilesLayout) {
+            mTopLargeTilesLayout.removeView(tileRecord.tileView);
+        } else if (mTileLayout != null) {
+            mTileLayout.removeTile(tileRecord);
+        }
     }
 
     public int getGridHeight() {
@@ -752,6 +796,17 @@ public class QSPanel extends LinearLayout implements Tunable {
      * @return height with the {@link QSPanel#setSquishinessFraction(float)} applied.
      */
     public int getSquishedHeight() {
+        if (mBrightnessView != null && mBrightnessView.getVisibility() != GONE
+                && mBrightnessView.getParent() == this) {
+            final ViewGroup.LayoutParams lp = mBrightnessView.getLayoutParams();
+            final int bottomMargin;
+            if (lp instanceof MarginLayoutParams) {
+                bottomMargin = ((MarginLayoutParams) lp).bottomMargin;
+            } else {
+                bottomMargin = 0;
+            }
+            return mBrightnessView.getBottom() + bottomMargin - getTop();
+        }
         if (mFooter != null) {
             final ViewGroup.LayoutParams footerLayoutParams = mFooter.getLayoutParams();
             final int footerBottomMargin;

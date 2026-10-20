@@ -23,6 +23,7 @@ import com.android.systemui.scene.shared.flag.SceneContainerFlag
  * Object to help check if the new QS ui should be used. This is true if either [QSComposeFragment]
  * or [SceneContainerFlag] are enabled.
  */
+@Suppress("NOTHING_TO_INLINE")
 object QsInCompose {
 
     /**
@@ -33,7 +34,7 @@ object QsInCompose {
 
     @JvmStatic
     inline val isEnabled: Boolean
-        get() = QSComposeFragment.isEnabled || SceneContainerFlag.isEnabled
+        get() = false
 
     @JvmStatic
     fun isUnexpectedlyInLegacyMode() =

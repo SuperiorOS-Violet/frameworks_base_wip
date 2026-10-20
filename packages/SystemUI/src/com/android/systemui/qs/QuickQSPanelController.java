@@ -35,9 +35,12 @@ import com.android.systemui.qs.dagger.QSScope;
 import com.android.systemui.qs.logging.QSLogger;
 import com.android.systemui.res.R;
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
+import com.android.systemui.settings.brightness.BrightnessController;
+import com.android.systemui.settings.brightness.BrightnessSliderController;
 import com.android.systemui.shade.ShadeDisplayAware;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.SplitShadeStateController;
+import com.android.systemui.tuner.TunerService;
 import com.android.systemui.util.leak.RotationUtils;
 
 import kotlinx.coroutines.flow.StateFlow;
@@ -57,6 +60,9 @@ public class QuickQSPanelController extends QSPanelControllerBase<QuickQSPanel> 
     private final Provider<Boolean> mUsingCollapsedLandscapeMediaProvider;
 
     private final MediaCarouselInteractor mMediaCarouselInteractor;
+    private final TunerService mTunerService;
+    private final BrightnessController mBrightnessController;
+    private final BrightnessSliderController mBrightnessSliderController;
 
     @Inject
     QuickQSPanelController(QuickQSPanel view, QSHost qsHost,
@@ -69,18 +75,27 @@ public class QuickQSPanelController extends QSPanelControllerBase<QuickQSPanel> 
             DumpManager dumpManager, SplitShadeStateController splitShadeStateController,
             Provider<QSLongPressEffect> longPressEffectProvider,
             MediaCarouselInteractor mediaCarouselInteractor,
-            @ShadeDisplayAware ConfigurationController configurationController
+            @ShadeDisplayAware ConfigurationController configurationController,
+            TunerService tunerService,
+            BrightnessController.Factory brightnessControllerFactory,
+            BrightnessSliderController.Factory brightnessSliderFactory
     ) {
         super(view, qsHost, qsCustomizerController, usingMediaPlayer, mediaHost, metricsLogger,
                 uiEventLogger, qsLogger, dumpManager, splitShadeStateController,
                 longPressEffectProvider, configurationController);
         mUsingCollapsedLandscapeMediaProvider = usingCollapsedLandscapeMediaProvider;
         mMediaCarouselInteractor = mediaCarouselInteractor;
+        mTunerService = tunerService;
+
+        mBrightnessSliderController = brightnessSliderFactory.create(getContext(), mView);
+        mView.setBrightnessView(mBrightnessSliderController.getRootView());
+        mBrightnessController = brightnessControllerFactory.create(mBrightnessSliderController);
     }
 
     @Override
     protected void onInit() {
         super.onInit();
+        mBrightnessSliderController.init();
         if (!SceneContainerFlag.isEnabled()) {
             updateMediaExpansion();
             mMediaHost.setShowsOnlyActiveMedia(true);
@@ -113,11 +128,23 @@ public class QuickQSPanelController extends QSPanelControllerBase<QuickQSPanel> 
     @Override
     protected void onViewAttached() {
         super.onViewAttached();
+        mTunerService.addTunable(mView, QSPanel.QS_SHOW_BRIGHTNESS);
     }
 
     @Override
     protected void onViewDetached() {
+        mTunerService.removeTunable(mView);
         super.onViewDetached();
+    }
+
+    @Override
+    void setListening(boolean listening) {
+        super.setListening(listening);
+        if (listening) {
+            mBrightnessController.registerCallbacks();
+        } else {
+            mBrightnessController.unregisterCallbacks();
+        }
     }
 
     private void setMaxTiles(int parseNumTiles) {
@@ -127,7 +154,7 @@ public class QuickQSPanelController extends QSPanelControllerBase<QuickQSPanel> 
 
     @Override
     protected void onConfigurationChanged() {
-        int newMaxTiles = getResources().getInteger(R.integer.quick_qs_panel_max_tiles);
+        int newMaxTiles = getResources().getInteger(R.integer.quick_qs_redesign_max_tiles);
         if (newMaxTiles != mView.getNumQuickTiles()) {
             setMaxTiles(newMaxTiles);
         }
