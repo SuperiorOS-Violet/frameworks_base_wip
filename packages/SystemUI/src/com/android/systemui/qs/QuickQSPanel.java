@@ -26,7 +26,6 @@ import android.widget.LinearLayout;
 import com.android.internal.logging.UiEventLogger;
 import com.android.systemui.FontSizeUtils;
 import com.android.systemui.plugins.qs.QSTile;
-import com.android.systemui.qs.QSPanelControllerBase.TileRecord;
 import com.android.systemui.res.R;
 
 /**
@@ -43,7 +42,7 @@ public class QuickQSPanel extends QSPanel {
 
     public QuickQSPanel(Context context, AttributeSet attrs) {
         super(context, attrs);
-        mMaxTiles = getResources().getInteger(R.integer.quick_qs_redesign_max_tiles);
+        mMaxTiles = getResources().getInteger(R.integer.quick_qs_panel_max_tiles);
     }
 
     @Override
@@ -97,7 +96,8 @@ public class QuickQSPanel extends QSPanel {
     @Override
     public void onTuningChanged(String key, String newValue) {
         if (QS_SHOW_BRIGHTNESS.equals(key)) {
-            super.onTuningChanged(key, newValue);
+            // No Brightness or Tooltip for you!
+            super.onTuningChanged(key, "0");
         }
     }
 
@@ -171,11 +171,6 @@ public class QuickQSPanel extends QSPanel {
     static class QQSSideLabelTileLayout extends SideLabelTileLayout {
 
         private boolean mLastSelected;
-        private int mLargeTilesCount;
-        private int mCircleColumns;
-        private int mLargeCellWidth;
-        private int mCircleCellWidth;
-        private int mLargeCellHeight;
 
         QQSSideLabelTileLayout(Context context) {
             super(context, null);
@@ -184,18 +179,14 @@ public class QuickQSPanel extends QSPanel {
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT,
                     LayoutParams.WRAP_CONTENT);
             setLayoutParams(lp);
-            setMaxColumns(getResources().getInteger(R.integer.quick_qs_circle_columns));
+            setMaxColumns(4);
         }
 
         @Override
         public boolean updateResources() {
             mResourceCellHeightResId = R.dimen.qs_quick_tile_size;
-            mLargeTilesCount = getResources().getInteger(
-                    R.integer.quick_settings_large_tiles_count);
-            mCircleColumns = getResources().getInteger(R.integer.quick_qs_circle_columns);
-            mLargeCellHeight = getResources().getDimensionPixelSize(R.dimen.qs_tile_height);
             boolean b = super.updateResources();
-            mMaxAllowedRows = getResources().getInteger(R.integer.quick_qs_redesign_max_rows);
+            mMaxAllowedRows = getResources().getInteger(R.integer.quick_qs_panel_max_rows);
             return b;
         }
 
@@ -217,55 +208,10 @@ public class QuickQSPanel extends QSPanel {
 
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            final int width = MeasureSpec.getSize(widthMeasureSpec);
-            final int availableWidth = width - getPaddingStart() - getPaddingEnd();
-
-            mLargeCellWidth = (availableWidth - mCellMarginHorizontal * (mLargeTilesCount - 1))
-                    / mLargeTilesCount;
-            mCircleCellWidth = (availableWidth - mCellMarginHorizontal * (mCircleColumns - 1))
-                    / mCircleColumns;
-            mCellHeight = mResourceCellHeight;
-
-            View previousView = this;
-            for (int i = 0; i < mRecords.size(); i++) {
-                TileRecord record = mRecords.get(i);
-                if (record.tileView.getVisibility() == GONE) continue;
-                int w = i < mLargeTilesCount ? mLargeCellWidth : mCircleCellWidth;
-                int h = i < mLargeTilesCount ? mLargeCellHeight : mCellHeight;
-                record.tileView.measure(exactly(w), exactly(h));
-                previousView = record.tileView.updateAccessibilityOrder(previousView);
-            }
-
-            int height = mRecords.size() > 0 ? mLargeCellHeight : 0;
-            if (mRecords.size() > mLargeTilesCount) {
-                height += mCellMarginVertical + mCellHeight;
-            }
-            setMeasuredDimension(width, height);
-        }
-
-        @Override
-        protected void onLayout(boolean changed, int l, int t, int r, int b) {
-            final boolean isRtl = getLayoutDirection() == LAYOUT_DIRECTION_RTL;
-            for (int i = 0; i < mRecords.size(); i++) {
-                TileRecord record = mRecords.get(i);
-                int left, top, w, h;
-                if (i < mLargeTilesCount) {
-                    int col = isRtl ? (mLargeTilesCount - 1 - i) : i;
-                    left = getPaddingStart() + col * (mLargeCellWidth + mCellMarginHorizontal);
-                    top = 0;
-                    w = mLargeCellWidth;
-                    h = mLargeCellHeight;
-                } else {
-                    int idx = i - mLargeTilesCount;
-                    int col = isRtl ? (mCircleColumns - 1 - idx) : idx;
-                    left = getPaddingStart() + col * (mCircleCellWidth + mCellMarginHorizontal);
-                    top = mLargeCellHeight + mCellMarginVertical;
-                    w = mCircleCellWidth;
-                    h = mCellHeight;
-                }
-                record.tileView.layout(left, top, left + w, top + h);
-                record.tileView.setPosition(i);
-            }
+            // Make sure to always use the correct number of rows. As it's determined by the
+            // columns, just use as many as needed.
+            updateMaxRows(10000, mRecords.size());
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         }
 
         @Override
